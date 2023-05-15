@@ -16,32 +16,20 @@ protected:
 
     
 public:
-    bool isEmpty() const;
-    int hashFunction(uint16_t key);
-    int insert(uint16_t key);
-    void removeItem(int key);
-    string searchTable(int key);
-    void printTable();
-    void initialize(int threshold);
-    void clear();
-    int accessesNum(uint16_t key);
-    bool test(uint16_t key);
-};
-
-//tested
-bool HashTable::isEmpty() const {
+    //tested
+bool isEmpty() const {
     return cumulative_count==0;
 }
 
 //tested
-void HashTable::initialize(int threshold){
+void initialize(int threshold){
     //this->hashGroups=hashGroups;
     this->threshold=threshold;
     clear();
 }
 
 //tested
-int HashTable::hashFunction(uint16_t key){
+int hashFunction(uint16_t key){
     uint16_t hashedv = key * 37;
     hashedv = hashedv ^ 0x5678;
     // hashedv = hashedv & 0xFFFFFFFF;
@@ -49,7 +37,7 @@ int HashTable::hashFunction(uint16_t key){
     return hashedv % hashGroups;
 }
 
-int HashTable::insert(uint16_t key){
+int insert(uint16_t key){
     int hashValue = hashFunction(key);
     auto& cell = table[hashValue]; //get the list
     auto bItr = begin(cell);
@@ -78,7 +66,7 @@ int HashTable::insert(uint16_t key){
 
 
 //modify this
-int HashTable::accessesNum(uint16_t key){
+int accessesNum(uint16_t key){
     int hashedValue = hashFunction(key);
      auto& cell = table[hashedValue]; //get the list
     auto bItr = begin(table[hashedValue]); 
@@ -90,7 +78,7 @@ int HashTable::accessesNum(uint16_t key){
     return 0;
 }
 
-bool HashTable::test(uint16_t key){
+bool test(uint16_t key){
     if (accessesNum(key)>=threshold){
         cout << "cant access row for now" << endl;
         return false;
@@ -98,7 +86,7 @@ bool HashTable::test(uint16_t key){
     return true;
 }
 
-void HashTable::removeItem(int key){
+void removeItem(int key){
         int hashValue = hashFunction(key);
     auto& cell = table[hashValue]; //get the list
     auto bItr = begin(cell);
@@ -119,7 +107,7 @@ void HashTable::removeItem(int key){
     return;
 }
 
-void HashTable::clear(){   
+void clear(){   
     for (int i = 0; i<hashGroups; i++){
         auto& cell = table[i]; //get the list
         auto bItr = begin(cell);
@@ -127,9 +115,10 @@ void HashTable::clear(){
            bItr = cell.erase(bItr);
       }
     }
+    cumulative_count=0;
 }
 
-void HashTable::printTable(){
+void printTable(){
     for (int i{}; i<hashGroups; i++){
         if (table[i].size() == 0) continue;
 
@@ -141,6 +130,7 @@ void HashTable::printTable(){
     }
     return;
 }
+};
 
 /*int main(){
     HashTable HT;

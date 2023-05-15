@@ -13,7 +13,6 @@
 #include <numeric>
 
 #include "Config.h"
-#include "BloomFilter.h"
 #include "HashTable.cpp"
 
 #define NUM_CORES 32 // Bad coding. Fix this in the future.
@@ -125,11 +124,8 @@ namespace ramulator
     float blockhammer_threshold;
     double blockhammer_window_size;
     int blockhammer_dryrun;
-    h3_bloom_filter_t bf[2]; //defining two instances of bloom filters.
-    long bf_start_time[2];
-    long hammer_cnts[2][NUM_CORES];
+    long hammer_cnts[NUM_CORES];
     double hammer_probs[NUM_CORES];
-    int active_bloom_filter;
     int blacklisted_act_budget;
     bool reset_other;
     int num_cores;
@@ -143,6 +139,7 @@ namespace ramulator
 
     //using HASHER
     HashTable ht;
+    long ht_start_time;
 
     // Defense mechanisms: TWiCe
     map<int, twice_table_entry> twice_table;
@@ -294,8 +291,8 @@ namespace ramulator
       num_cores = configs.get_int("cores");
       assert(num_cores <= NUM_CORES); // @Giray: Bad coding, fix this in the future.
       for (int i = 0 ; i < num_cores ; i++){
-        hammer_cnts[0][i] = 0;
-        hammer_cnts[1][i] = 0;
+        hammer_cnts[i] = 0;
+        hammer_cnts[i] = 0;
         hammer_probs[i] = 0;
       }
       open_hammer_probs_file();
@@ -629,13 +626,6 @@ namespace ramulator
       this->n_bf_window     = this->n_act_max / this->blockhammer_nbf; //Num of tCBF windows in a tREFW window
       this->rowhammer_threshold_tcbf = this->rowhammer_threshold_trefw / this->n_bf_window; //n_rh_bf
       this->throttle_threshold = configs.get_float("blockhammer_tth");
-      // cout << "blockhammer_nth :  " << this->blockhammer_nth << endl;
-      // cout << "blockhammer_nbf :  " << this->blockhammer_nbf << endl;
-      // cout << "bf_size         :  " << this->bf_size         << endl;
-      // cout << "n_bf_window     :  " << this->n_bf_window     << endl;
-      // cout << "rowhammer_threshold_trefw: " << this->rowhammer_threshold_trefw << endl;
-
-
       this->method = ROWHAMMER_DEFENSE::NONE;
 
       if (method_str == "para") {
@@ -675,16 +665,12 @@ namespace ramulator
                << endl;
         }
 
-        this->active_bloom_filter = 0;
         ht.initialize(31243);
-        //bf[0].initialize(bf_size, this->blockhammer_nth, this->blockhammer_nbf, 31243); // 31243 is a randomly generated seed
-        //bf[1].initialize(bf_size, this->blockhammer_nth, this->blockhammer_nbf, 54322); // 54322 is a randomly generated seed
-        bf_start_time[0] = 0;
-        bf_start_time[1] = 0;
-        //ht_start_time=0;
+        //.initialize(bf_size, this->blockhammer_nth, this->blockhammer_nbf, 31243); // 31243 is a randomly generated seed
+        ht_start_time=0;
 
         if (this->print_conf){
-          cout  << "  Bloom filter triggers blockhammer after "
+          cout  << "  HASH FUNC triggers blockhammer after "
                 << dec << this->blockhammer_nth << " acts." << endl
                 << "  Then BlockHammer enforces a delay of "
                 << dec << t_delay
@@ -915,10 +901,9 @@ namespace ramulator
       outfile.open(hammer_probs_file, ios::out | ios::app);
       outfile << clk;
       for (int i = 0 ; i < num_cores; i++){
-        float hammer_prob = (hammer_cnts[active_bloom_filter][i] * 1.0 / (rowhammer_threshold_tcbf - blockhammer_nth));
+        float hammer_prob = (hammer_cnts[i] * 1.0 / (rowhammer_threshold_tcbf - blockhammer_nth));
         hammer_probs[i] = (hammer_prob + hammer_probs[i] * num_tcbfs) / (num_tcbfs + 1);  
-        // cout << "[" << clk << "] " << this->comp_name << " Core ID: " << i << " Blacklisted ACT cnt: " << dec << hammer_cnts[active_bloom_filter][i]  << " RHLI: " << dec << hammer_prob << " RHLIavg: " << dec << hammer_probs[i] << endl;
-        hammer_cnts[active_bloom_filter][i] = 0;
+        hammer_cnts[i] = 0;
         outfile << "," << hammer_prob;
       }
       num_tcbfs ++;
@@ -1265,7 +1250,7 @@ namespace ramulator
     float get_throttling_coeff(int row_id, int coreid, bool is_real_hammer)
     {
       if(this->method == ROWHAMMER_DEFENSE::BLOCKHAMMER && this->blockhammer_dryrun == 0 ){
-        float room = (float) (blacklisted_act_budget - hammer_cnts[active_bloom_filter][coreid]);
+        float room = (float) (blacklisted_act_budget - hammer_cnts[coreid]);
         float throttle_coeff = room / blacklisted_act_budget;
         
         if (throttle_coeff < this->throttle_threshold){
@@ -1294,17 +1279,15 @@ namespace ramulator
           {
             // cout << "Asking BlockHammer @ " << this->comp_name << " if activating row " << row_id << " @ clk " << clk << " is safe...";
               
-            if (clk - bf_start_time[active_bloom_filter] > this->nREFW / this->n_bf_window)
+            if (clk - ht_start_time > this->nREFW / this->n_bf_window)
             { // tCBF has passed; the active filter should change.
-              //bf[active_bloom_filter].clear();
               ht.clear();
-              bf_start_time[active_bloom_filter] = clk;
+              ht_start_time = clk;
               append_hammer_probs_file();
-              active_bloom_filter = 1 - active_bloom_filter;
+              
             }
 
             bool ht_response = ht.test(row_id);
-            //bool bf_response = bf[active_bloom_filter].test(row_id);
             if (ht_response && this->blockhammer_dryrun == 0) // the row is blacklisted
             {
               long blocked_until = this->does_blockhammer_approve(row_id, clk, is_real_hammer);
@@ -1494,16 +1477,13 @@ namespace ramulator
           {
             if(adj_row_refresh_cnt != 0) break;
             // cout << "  [BlockHammer] Inserting ACT into CBF"
-            //     << 1-active_bloom_filter << "." << endl;
             int passive_count = ht.insert(row_id);
             ht.insert(row_id);
             // cout << "  [BlockHammer] Inserting ACT into CBF"
-            //     << active_bloom_filter << "." << endl;
             if(ht.test(row_id))
             {
-              // cout << "  [BlockHammer] Active filter is " << active_bloom_filter
               //     << " passive count is " << passive_count << "." << endl;
-              hammer_cnts[active_bloom_filter][coreid] ++;
+              hammer_cnts[coreid] ++;
               if (is_verbose){
                 // cout << "Core " << coreid << " activated a blacklisted row ("
                 //     << row_id << ")" << endl;
@@ -1511,17 +1491,16 @@ namespace ramulator
             }
 
             if ((passive_count > this->blockhammer_nbf / 2) ||
-                (clk - bf_start_time[active_bloom_filter] > this->nREFW/this->n_bf_window))
+                (clk - ht_start_time > this->nREFW/this->n_bf_window))
             {
               // switch filters
               // cout << "  [BlockHammer] Switching the active filter." << endl;
               append_hammer_probs_file();
               ht.clear();
-              bf_start_time[active_bloom_filter] = clk;
+              ht_start_time = clk;
               for (int i = 0 ; i < num_cores ; i++){
-                hammer_cnts[active_bloom_filter][i] = 0;
+                hammer_cnts[i] = 0;
               }
-              active_bloom_filter = 1 - active_bloom_filter;
             }
           break;
         }
@@ -1789,7 +1768,6 @@ namespace ramulator
       // Blockhammer watches you, even asleep
       switch (this->method){
         case ROWHAMMER_DEFENSE::BLOCKHAMMER :
-        // case ROWHAMMER_DEFENSE::BLOOM_FILTERED_BLOCKHAMMER:
         // case ROWHAMMER_DEFENSE::CORRECTED_BLOCKHAMMER:
         // case ROWHAMMER_DEFENSE::BLOCKHAMMER_TOLERANT:
           if (this->blockhammer_dryrun == 0){
