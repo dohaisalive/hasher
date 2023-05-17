@@ -56,7 +56,7 @@ do
 
   mechcmd="$sccmd -p outdir=$MECHOUTDIR";
   mechcmd="$mechcmd -c rowhammer_defense=blockhammer";
-  mechcmd="$mechcmd -c threshold=291";
+  mechcmd="$mechcmd -c threshold=2048";
   mechcmd="$mechcmd -c blockhammer_nth=1024";
   mechcmd="$mechcmd -c blockhammer_nbf=1048576";
   mechcmd="$mechcmd -c bf_size=16384";

@@ -1,6 +1,8 @@
 #include <iostream>
 #include <list>
 #include <cstring>
+#include<bitset>
+#include<array> 
 using namespace std;
 
 // Hashtable to implement 
@@ -10,12 +12,55 @@ using namespace std;
 class HashTable
 {
 protected:
+    int qMatrix[16][1];
+    int binaryArray[16];
+    int countOnes = 0;
     int threshold=128;
     int cumulative_count=0;
     list<pair<int, int>> table[hashGroups]; //List1, list2, ....
 
     
 public:
+
+void generateQMatrix(){
+    for(int i{}; i < 16; i++){
+        int random = 1+ (rand() % 65535); //generate random number between 1 - 65536
+        qMatrix[i][0] = random; // append the random number to the q-matrix
+    }
+}
+
+void getBinaryArray(int value){
+
+     bitset<32> A=value;//"A" will hold the binary representation of N
+     for (int i = 0, j = 15; i < 16; ++i, j--) {
+       binaryArray[i] = A[j];
+       if (binaryArray[i] == 1){ //count the number of ones to create an array that holds the positions of ones.
+        countOnes = countOnes+1;
+       }
+       
+       cout << "array   " << binaryArray[i] <<"  " << i << endl;
+   }
+}
+
+
+int* arrayOfPositions(){
+    int count = countOnes;
+    int *positionsArray = new int[count];
+    int j = 0;
+
+    for(int i{}; i < 16; i++){
+        if(binaryArray[i] == 1){
+            positionsArray[j] = i;
+            
+            cout << "position  " << j << " value " << positionsArray[j] << endl;
+            
+            j++;
+        }
+    }
+    return positionsArray;
+}
+
+
     //tested
 bool isEmpty() const {
     return cumulative_count==0;
@@ -25,16 +70,20 @@ bool isEmpty() const {
 void initialize(int threshold){
     //this->hashGroups=hashGroups;
     this->threshold=threshold;
+    generateQMatrix(); //generate new q-matrix when initializing new hash table
     clear();
 }
 
 //tested
 int hashFunction(uint16_t key){
-    uint16_t hashedv = key * 37;
-    hashedv = hashedv ^ 0x5678;
-    // hashedv = hashedv & 0xFFFFFFFF;
-    // return hashedv;
-    return hashedv % hashGroups;
+    getBinaryArray(key);
+    int *positionsArray = arrayOfPositions();
+    int initialValue = positionsArray[0];
+    int result = qMatrix[initialValue][0];
+    for(int i = 1; i < countOnes; i++){
+        result = result ^ qMatrix[positionsArray[i]][0];
+    }
+return result;
 }
 
 int insert(uint16_t key){

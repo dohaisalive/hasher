@@ -81,7 +81,7 @@ private:
         {"rowhammer_stats", "rowhammer_stats"},
         {"rowhammer_defense", "none"},     // Which defense mechanism to simulate?
         {"rowhammer_defense_level", "-1"}, // Which hierarchical level to put the RowHammmer defense? (e.g., per rank/per bank)
-        {"rowhammer_threshold", "65536"},  // # of ACTs to induce a bit flip (aka. HCfirst and MAC)
+        {"rowhammer_threshold", "2"},  // # of ACTs to induce a bit flip (aka. HCfirst and MAC)
         {"rowhammer_br", "1"},             // RowHammer Blast Radius
         {"aggrow0",  "-1"}, {"aggrow1",  "-1"}, {"aggrow2",  "-1"}, {"aggrow3",  "-1"},
         {"aggrow4",  "-1"}, {"aggrow5",  "-1"}, {"aggrow6",  "-1"}, {"aggrow7",  "-1"},
@@ -92,7 +92,7 @@ private:
         {"para_threshold", "0.001f"},
 
         // HASHED
-        {"threshold","128"},
+        {"threshold","2048"},
                 
         // BlockHammer
         {"bf_hash_cnt", "0"},         // Number of hash functions in BlockHammer's Bloom filters
